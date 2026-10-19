@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pantheon — Painel de Indicadores</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --primary:#5A3A62; --primary-dark:#3E2745; --secondary:#8C6790; --gold:#B79355; --gold-light:#D8BE8A;
+    --lilac-bg:#F6F1F7; --lilac-card:#FFFFFF; --lilac-border:#E4D5E6; --text-dark:#2E2233; --text-muted:#7A6B7E;
+    --green:#4C8C6B; --red:#B5525C;
+    --shadow: 0 2px 10px rgba(62,39,69,0.08); --shadow-lg: 0 8px 28px rgba(62,39,69,0.14);
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Segoe UI', Calibri, Arial, sans-serif; background:var(--lilac-bg); color:var(--text-dark); }
+  .app{ display:flex; min-height:100vh; }
+  .sidebar{ width:230px; background:linear-gradient(180deg, var(--primary-dark), var(--primary)); color:#fff; display:flex; flex-direction:column; padding:24px 0; flex-shrink:0; }
+  .brand{ padding:0 24px 20px 24px; border-bottom:1px solid rgba(255,255,255,0.15); margin-bottom:12px; }
+  .brand .logo{ font-family:Georgia, serif; font-size:26px; font-weight:700; letter-spacing:1px;}
+  .brand .tagline{ font-size:9px; letter-spacing:1.5px; color:var(--gold-light); margin-top:4px; text-transform:uppercase;}
+  .nav{ list-style:none; padding:0; margin:0; flex:1;}
+  .nav li{ margin:2px 12px; }
+  .nav button{ width:100%; text-align:left; background:transparent; border:none; color:rgba(255,255,255,0.85); font-size:14px; padding:11px 14px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:10px; transition:background .15s; }
+  .nav button .ic{ font-size:16px; width:18px; text-align:center; }
+  .nav button:hover{ background:rgba(255,255,255,0.08); }
+  .nav button.active{ background:var(--gold); color:var(--primary-dark); font-weight:600; }
+  .sidebar-footer{ padding:16px 24px 0; font-size:10px; color:rgba(255,255,255,0.45); border-top:1px solid rgba(255,255,255,0.1); margin-top:12px;}
+  .main{ flex:1; padding:26px 32px; max-width:1280px; min-width:0; }
+  .topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:22px; flex-wrap:wrap; gap:12px; }
+  .topbar h1{ font-size:20px; margin:0; color:var(--primary-dark);}
+  .topbar .sub{ font-size:12px; color:var(--text-muted); margin-top:2px;}
+  .filter-group{ display:flex; align-items:center; gap:10px;}
+  .filter-group label{ font-size:12px; color:var(--text-muted); font-weight:600;}
+  select{ padding:8px 14px; border-radius:8px; border:1px solid var(--lilac-border); background:#fff; color:var(--text-dark); font-size:13px; font-weight:600; cursor:pointer; box-shadow:var(--shadow); }
+  .badge-live{ display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--green); font-weight:600; background:#E9F3EE; padding:5px 10px; border-radius:20px; }
+  .badge-live .dot{ width:7px; height:7px; border-radius:50%; background:var(--green); }
+  .kpi-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:14px; margin-bottom:22px; }
+  .kpi-card{ background:var(--lilac-card); border-radius:12px; padding:16px 18px; box-shadow:var(--shadow); border-top:3px solid var(--gold); transition:transform .15s, box-shadow .15s; }
+  .kpi-card:hover{ transform:translateY(-2px); box-shadow:var(--shadow-lg); }
+  .kpi-card .label{ font-size:11px; color:var(--text-muted); font-weight:700; letter-spacing:.4px; text-transform:uppercase;}
+  .kpi-card .value{ font-size:22px; font-weight:700; color:var(--primary-dark); margin-top:8px;}
+  .panel-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;}
+  .panel{ background:var(--lilac-card); border-radius:12px; padding:18px 20px; box-shadow:var(--shadow); min-width:0; }
+  .panel h3{ font-size:13px; margin:0 0 14px 0; color:var(--primary-dark); text-transform:uppercase; letter-spacing:.4px;}
+  .panel .chart-wrap{ position:relative; height:230px; }
+  .panel.full{ grid-column:1 / -1; }
+  table{ width:100%; border-collapse:collapse; font-size:13px;}
+  thead th{ background:var(--primary); color:#fff; padding:10px 10px; text-align:center; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
+  thead th:first-child{ text-align:left; border-radius:8px 0 0 0;}
+  thead th:last-child{ border-radius:0 8px 0 0;}
+  tbody td{ padding:9px 10px; text-align:center; border-bottom:1px solid var(--lilac-border); }
+  tbody td:first-child{ text-align:left; font-weight:700; color:var(--text-dark);}
+  tbody tr:nth-child(even){ background:var(--lilac-bg); }
+  tbody tr.selected{ background:#F1E4D6 !important; box-shadow:inset 3px 0 0 var(--gold); }
+  tfoot td{ padding:10px; text-align:center; font-weight:700; background:var(--gold-light); color:var(--primary-dark); }
+  tfoot td:first-child{ text-align:left; border-radius:0 0 0 8px;}
+  tfoot td:last-child{ border-radius:0 0 8px 0;}
+  .section{ display:none; }
+  .section.active{ display:block; animation:fadein .25s ease; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+  @media (max-width:900px){
+    .panel-grid{ grid-template-columns:1fr; }
+    .app{ flex-direction:column; }
+    .sidebar{ width:100%; flex-direction:row; overflow-x:auto; padding:12px; }
+    .brand{ display:none; }
+    .nav{ display:flex; }
+    .nav li{ margin:0 4px;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar">
+    <div class="brand">
+      <div class="logo">Pantheon</div>
+      <div class="tagline">Emagrecimento • Hipertrofia • Longevidade</div>
+    </div>
+    <ul class="nav">
+      <li><button class="navbtn active" data-section="dashboard"><span class="ic">&#9673;</span> Dashboard</button></li>
+      <li><button class="navbtn" data-section="atendimentos"><span class="ic">&#9737;</span> Atendimentos</button></li>
+      <li><button class="navbtn" data-section="faturamento"><span class="ic">&#164;</span> Faturamento</button></li>
+      <li><button class="navbtn" data-section="pacientes"><span class="ic">&#9826;</span> Pacientes</button></li>
+      <li><button class="navbtn" data-section="amhpdf"><span class="ic">&#8623;</span> AMHPDF</button></li>
+    </ul>
+    <div class="sidebar-footer">Painel gerado a partir do KPI 2026<br>Janeiro – Setembro</div>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Painel de Indicadores</h1>
+        <div class="sub" id="pageSub">Visão geral — Janeiro a Setembro de 2026</div>
+      </div>
+      <div class="filter-group">
+        <span class="badge-live"><span class="dot"></span> Dados carregados</span>
+        <label for="monthFilter">Período:</label>
+        <select id="monthFilter">
+          <option value="all" selected>Período completo</option>
+          <option value="0">Janeiro</option><option value="1">Fevereiro</option><option value="2">Março</option>
+          <option value="3">Abril</option><option value="4">Maio</option><option value="5">Junho</option>
+          <option value="6">Julho</option><option value="7">Agosto</option><option value="8">Setembro</option>
+        </select>
+      </div>
+    </div>
+
+    <section class="section active" id="sec-dashboard">
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div class="panel-grid">
+        <div class="panel"><h3>Faturamento mensal (R$)</h3><div class="chart-wrap"><canvas id="chartFaturamento"></canvas></div></div>
+        <div class="panel"><h3>Atendimentos por serviço</h3><div class="chart-wrap"><canvas id="chartServicos"></canvas></div></div>
+        <div class="panel"><h3>Mix de faturamento por origem</h3><div class="chart-wrap"><canvas id="chartMix"></canvas></div></div>
+        <div class="panel"><h3>Taxa de no-show (%)</h3><div class="chart-wrap"><canvas id="chartNoshow"></canvas></div></div>
+      </div>
+    </section>
+
+    <section class="section" id="sec-atendimentos">
+      <div class="panel full" style="margin-bottom:16px;">
+        <h3>Quantidade de atendimento por serviço</h3>
+        <div class="chart-wrap" style="height:310px;"><canvas id="chartAtendLine"></canvas></div>
+      </div>
+      <div class="panel full"><h3>Detalhamento mensal</h3><div style="overflow-x:auto;"><table id="tblAtendimentos"></table></div></div>
+    </section>
+
+    <section class="section" id="sec-faturamento">
+      <div class="panel full" style="margin-bottom:16px;">
+        <h3>Faturamento por origem — evolução mensal</h3>
+        <div class="chart-wrap" style="height:260px;"><canvas id="chartFatLine"></canvas></div>
+      </div>
+      <div class="panel full"><h3>Detalhamento mensal</h3><div style="overflow-x:auto;"><table id="tblFaturamento"></table></div></div>
+    </section>
+
+    <section class="section" id="sec-pacientes">
+      <div class="panel-grid" style="margin-bottom:16px;">
+        <div class="panel"><h3>Pacientes novos x mensagens de consulta</h3><div class="chart-wrap"><canvas id="chartPacientes"></canvas></div></div>
+        <div class="panel"><h3>Taxa de no-show</h3><div class="chart-wrap"><canvas id="chartNoshow2"></canvas></div></div>
+      </div>
+      <div class="panel full"><h3>Detalhamento mensal</h3><div style="overflow-x:auto;"><table id="tblPacientes"></table></div></div>
+    </section>
+
+    <section class="section" id="sec-amhpdf">
+      <div class="panel full" style="margin-bottom:16px;">
+        <h3>Recebido AMHPDF — evolução mensal</h3>
+        <div class="chart-wrap" style="height:260px;"><canvas id="chartAmh"></canvas></div>
+      </div>
+      <div class="panel full"><h3>Detalhamento mensal</h3><div style="overflow-x:auto;"><table id="tblAmh"></table></div></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro"];
+const PRIMARY = "#5A3A62", SECONDARY="#8C6790", GOLD="#B79355", RED="#B5525C";
+const PALETTE = ["#5A3A62","#8C6790","#C97BA8","#B79355","#C9A9CE","#7A6B7E","#D8BE8A"];
+const services = ["Consulta","Nutrição","Bioimpedância","Ultrassonografia","Polissonografia","Implante","Injetáveis"];
+
+const atendimentos = {
+  Consulta:[401,405,447,361,380,312,385,457,405],
+  "Nutrição":[64,48,68,83,56,60,63,53,61],
+  "Bioimpedância":[256,208,258,312,331,311,396,450,435],
+  Ultrassonografia:[32,33,20,26,30,37,29,53,51],
+  Polissonografia:[16,13,9,13,17,21,21,26,39],
+  Implante:[5,10,1,0,0,2,2,1,1],
+  "Injetáveis":[264,304,258,207,240,246,288,257,323],
+};
+const atendTotal = MONTHS.map((_,i)=> Object.values(atendimentos).reduce((s,a)=>s+a[i],0));
+
+const faturamento = {
+  plano:[148135.04,111515.95,145806.60,165252.20,234647.30,155158.17,244228.66,360555.94,322238.12],
+  reembolso:[25342.43,9006.96,9342.10,14220.45,3291.58,1825.40,6535.94,20763.72,16558.13],
+  particular:[228681.62,313555.57,209569.25,208995.25,110739.67,207954.60,170433.23,136193.36,147883.94],
+  cortesia:[2800.36,1300.00,1458.76,1202.27,1083.00,4690.17,2424.26,2648.69,1742.28],
+};
+const faturamentoTotal = MONTHS.map((_,i)=> faturamento.plano[i]+faturamento.reembolso[i]+faturamento.particular[i]);
+
+const amhpdf = [43125.46,37047.84,95134.97,117609.84,96972.39,170761.82,141726.75,161972.12,204161.28];
+
+const pacientes = {
+  mensagem:[634,580,693,533,null,null,678,496,653],
+  novos:[188,188,166,212,209,121,176,218,156],
+  noshow:[0.18,0.14,0.16,0.16,0.16,0.20,0.18,0.21,0.20],
+};
+
+const hasVal = v => v!==null && v!==undefined;
+const fmtCur = v => hasVal(v) ? "R$ " + v.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}) : "—";
+const fmtNum = v => hasVal(v) ? v.toLocaleString('pt-BR') : "—";
+const fmtPct = v => hasVal(v) ? (v*100).toFixed(1).replace('.',',') + "%" : "—";
+const sum = arr => arr.reduce((a,b)=>a+(b||0),0);
+const avg = arr => { const f = arr.filter(hasVal); return f.length ? sum(f)/f.length : null; };
+const sumOrNull = arr => arr.some(hasVal) ? sum(arr) : null;
+
+let currentMonth = "all";
+let charts = {};
+const idxRange = () => currentMonth === "all" ? MONTHS.map((_,i)=>i) : [parseInt(currentMonth)];
+
+function buildKPIs(){
+  const idx = idxRange();
+  const fatTot = sum(idx.map(i=>faturamentoTotal[i]));
+  const atTot = sum(idx.map(i=>atendTotal[i]));
+  const cards = [
+    {label:"Faturamento total", value: fmtCur(fatTot)},
+    {label:"Atendimentos totais", value: fmtNum(atTot)},
+    {label:"Ticket médio", value: fmtCur(atTot ? fatTot/atTot : null)},
+    {label:"Pacientes novos", value: fmtNum(sumOrNull(idx.map(i=>pacientes.novos[i])))},
+    {label:"No-show médio", value: fmtPct(avg(idx.map(i=>pacientes.noshow[i])))},
+    {label:"Recebido AMHPDF", value: fmtCur(sumOrNull(idx.map(i=>amhpdf[i])))},
+  ];
+  document.getElementById('kpiGrid').innerHTML = cards.map(c=>`
+    <div class="kpi-card"><div class="label">${c.label}</div><div class="value">${c.value}</div></div>`).join('');
+}
+
+function baseOpts(extra={}){
+  return Object.assign({
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ labels:{ font:{size:11}, color:'#2E2233'} } },
+    scales:{ x:{ ticks:{color:'#7A6B7E', font:{size:10}}, grid:{display:false} }, y:{ ticks:{color:'#7A6B7E', font:{size:10}}, grid:{color:'#EFE6F0'} } }
+  }, extra);
+}
+const highlightPointColors = base => MONTHS.map((_,i)=> currentMonth!=="all" && parseInt(currentMonth)===i ? GOLD : base);
+function makeChart(id, config){
+  if(charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id).getContext('2d'), config);
+}
+const pctScales = { y:{ ticks:{ callback:v=>fmtPct(v), color:'#7A6B7E'}, grid:{color:'#EFE6F0'}}, x:{ticks:{color:'#7A6B7E'}, grid:{display:false}} };
+
+function renderDashboardCharts(){
+  makeChart('chartFaturamento', { type:'line',
+    data:{ labels:MONTHS, datasets:[{ label:'Faturamento', data:faturamentoTotal, borderColor:PRIMARY, backgroundColor:'rgba(90,58,98,0.08)', fill:true, tension:.3, pointRadius:5, pointBackgroundColor:highlightPointColors(PRIMARY) }]},
+    options: baseOpts({ plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>fmtCur(c.raw)}}} }) });
+  makeChart('chartServicos', { type:'bar',
+    data:{ labels:services, datasets:[{ label:'Atendimentos', data:services.map(s=>sum(atendimentos[s])), backgroundColor:PALETTE, borderRadius:6 }]},
+    options: baseOpts({ plugins:{legend:{display:false}} }) });
+  const idx = idxRange();
+  makeChart('chartMix', { type:'doughnut',
+    data:{ labels:['Plano de saúde','Reembolso','Particular'], datasets:[{ data:[sum(idx.map(i=>faturamento.plano[i])), sum(idx.map(i=>faturamento.reembolso[i])), sum(idx.map(i=>faturamento.particular[i]))], backgroundColor:[PRIMARY,SECONDARY,GOLD] }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:11}}}, tooltip:{callbacks:{label:c=>fmtCur(c.raw)}}} } });
+  makeChart('chartNoshow', { type:'line',
+    data:{ labels:MONTHS, datasets:[{ label:'No-show', data:pacientes.noshow, borderColor:GOLD, backgroundColor:'rgba(183,147,85,0.1)', fill:true, tension:.3, pointRadius:5, pointBackgroundColor:highlightPointColors(GOLD) }]},
+    options: baseOpts({ plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>fmtPct(c.raw)}}}, scales:pctScales }) });
+}
+
+function renderAtendimentosSection(){
+  makeChart('chartAtendLine', { type:'bar',
+    data:{ labels:MONTHS, datasets:[
+      ...services.map((s,i)=>({ type:'bar', label:s, data:atendimentos[s], backgroundColor:PALETTE[i], stack:'svc', borderRadius:3, maxBarThickness:46 })),
+      { type:'line', label:'Total', data:atendTotal, borderColor:'#2E2233', backgroundColor:'#2E2233', borderWidth:2, borderDash:[4,3], pointRadius:4, pointBackgroundColor:'#2E2233', tension:.25, yAxisID:'y', order:0 }
+    ]},
+    options: baseOpts({ plugins:{ legend:{ position:'bottom', labels:{ boxWidth:11, font:{size:10.5} } }, tooltip:{ mode:'index', intersect:false } },
+      scales:{ x:{ stacked:true, ticks:{color:'#7A6B7E', font:{size:10}}, grid:{display:false} }, y:{ stacked:true, ticks:{color:'#7A6B7E', font:{size:10}}, grid:{color:'#EFE6F0'} } } }) });
+  let html = '<thead><tr><th>Mês</th>' + services.map(s=>`<th>${s}</th>`).join('') + '<th>Total</th></tr></thead><tbody>';
+  MONTHS.forEach((m,i)=>{
+    const sel = (currentMonth!=="all" && parseInt(currentMonth)===i) ? ' class="selected"' : '';
+    html += `<tr${sel}><td>${m}</td>` + services.map(s=>`<td>${fmtNum(atendimentos[s][i])}</td>`).join('') + `<td><strong>${fmtNum(atendTotal[i])}</strong></td></tr>`;
+  });
+  html += '</tbody><tfoot><tr><td>Total</td>' + services.map(s=>`<td>${fmtNum(sum(atendimentos[s]))}</td>`).join('') + `<td>${fmtNum(sum(atendTotal))}</td></tr></tfoot>`;
+  document.getElementById('tblAtendimentos').innerHTML = html;
+}
+
+function renderFaturamentoSection(){
+  makeChart('chartFatLine', { type:'line',
+    data:{ labels:MONTHS, datasets:[
+      {label:'Plano de saúde', data:faturamento.plano, borderColor:PRIMARY, tension:.3, pointRadius:3},
+      {label:'Reembolso', data:faturamento.reembolso, borderColor:SECONDARY, tension:.3, pointRadius:3},
+      {label:'Particular', data:faturamento.particular, borderColor:GOLD, tension:.3, pointRadius:3},
+    ]},
+    options: baseOpts({ plugins:{legend:{labels:{font:{size:11}}}, tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmtCur(c.raw)}`}}} }) });
+  let html = '<thead><tr><th>Mês</th><th>Plano de saúde</th><th>Reembolso</th><th>Particular</th><th>Total</th><th>Cortesia</th></tr></thead><tbody>';
+  MONTHS.forEach((m,i)=>{
+    const sel = (currentMonth!=="all" && parseInt(currentMonth)===i) ? ' class="selected"' : '';
+    html += `<tr${sel}><td>${m}</td><td>${fmtCur(faturamento.plano[i])}</td><td>${fmtCur(faturamento.reembolso[i])}</td><td>${fmtCur(faturamento.particular[i])}</td><td><strong>${fmtCur(faturamentoTotal[i])}</strong></td><td>${fmtCur(faturamento.cortesia[i])}</td></tr>`;
+  });
+  html += `</tbody><tfoot><tr><td>Total</td><td>${fmtCur(sum(faturamento.plano))}</td><td>${fmtCur(sum(faturamento.reembolso))}</td><td>${fmtCur(sum(faturamento.particular))}</td><td>${fmtCur(sum(faturamentoTotal))}</td><td>${fmtCur(sum(faturamento.cortesia))}</td></tr></tfoot>`;
+  document.getElementById('tblFaturamento').innerHTML = html;
+}
+
+function renderPacientesSection(){
+  makeChart('chartPacientes', { type:'bar',
+    data:{ labels:MONTHS, datasets:[
+      {label:'Mensagens de consulta', data:pacientes.mensagem, backgroundColor:SECONDARY, borderRadius:5},
+      {label:'Pacientes novos', data:pacientes.novos, backgroundColor:GOLD, borderRadius:5},
+    ]}, options: baseOpts() });
+  makeChart('chartNoshow2', { type:'line',
+    data:{ labels:MONTHS, datasets:[{ label:'No-show', data:pacientes.noshow, borderColor:RED, backgroundColor:'rgba(181,82,92,0.1)', fill:true, tension:.3, pointRadius:5, pointBackgroundColor:highlightPointColors(RED) }]},
+    options: baseOpts({ plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>fmtPct(c.raw)}}}, scales:pctScales }) });
+  let html = '<thead><tr><th>Mês</th><th>Mensagem de consulta</th><th>Pacientes novos</th><th>No-show</th></tr></thead><tbody>';
+  MONTHS.forEach((m,i)=>{
+    const sel = (currentMonth!=="all" && parseInt(currentMonth)===i) ? ' class="selected"' : '';
+    html += `<tr${sel}><td>${m}</td><td>${fmtNum(pacientes.mensagem[i])}</td><td>${fmtNum(pacientes.novos[i])}</td><td>${fmtPct(pacientes.noshow[i])}</td></tr>`;
+  });
+  html += `</tbody><tfoot><tr><td>Total / Média</td><td>${fmtNum(sumOrNull(pacientes.mensagem))}</td><td>${fmtNum(sumOrNull(pacientes.novos))}</td><td>${fmtPct(avg(pacientes.noshow))}</td></tr></tfoot>`;
+  document.getElementById('tblPacientes').innerHTML = html;
+}
+
+function renderAmhSection(){
+  makeChart('chartAmh', { type:'bar',
+    data:{ labels:MONTHS, datasets:[{ label:'Recebido', data:amhpdf, backgroundColor:highlightPointColors(PRIMARY), borderRadius:6 }]},
+    options: baseOpts({ plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>fmtCur(c.raw)}}} }) });
+  let html = '<thead><tr><th>Mês</th><th>Recebido</th></tr></thead><tbody>';
+  MONTHS.forEach((m,i)=>{
+    const sel = (currentMonth!=="all" && parseInt(currentMonth)===i) ? ' class="selected"' : '';
+    html += `<tr${sel}><td>${m}</td><td>${fmtCur(amhpdf[i])}</td></tr>`;
+  });
+  html += `</tbody><tfoot><tr><td>Total</td><td>${fmtCur(sumOrNull(amhpdf))}</td></tr></tfoot>`;
+  document.getElementById('tblAmh').innerHTML = html;
+}
+
+function renderAll(){
+  buildKPIs(); renderDashboardCharts(); renderAtendimentosSection(); renderFaturamentoSection(); renderPacientesSection(); renderAmhSection();
+}
+
+document.getElementById('monthFilter').addEventListener('change', e=>{
+  currentMonth = e.target.value;
+  document.getElementById('pageSub').textContent = currentMonth === "all" ? "Visão geral — Janeiro a Setembro de 2026" : `Visão geral — ${MONTHS[currentMonth]} de 2026`;
+  renderAll();
+});
+document.querySelectorAll('.navbtn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+    document.getElementById('sec-'+btn.dataset.section).classList.add('active');
+    const titles = {dashboard:"Painel de Indicadores", atendimentos:"Atendimentos", faturamento:"Faturamento", pacientes:"Pacientes", amhpdf:"AMHPDF"};
+    document.getElementById('pageTitle').textContent = titles[btn.dataset.section];
+  });
+});
+renderAll();
+</script>
+</body>
+</html>
